@@ -1,66 +1,77 @@
+كيفية منع هجوم عبور المسار
+الطريقة الأكثر فعالية لمنع ثغرات عبور المسار هي تجنب تمرير مدخلات المستخدم إلى واجهات برمجة تطبيقات نظام الملفات تمامًا. يمكن إعادة كتابة العديد من وظائف التطبيقات التي تقوم بذلك لتحقيق نفس الأداء بطريقة أكثر أمانًا.
+
+إذا لم تتمكن من تجنب تمرير المدخلات التي يوفرها المستخدم إلى واجهات برمجة تطبيقات نظام الملفات، فنوصي باستخدام طبقتين من الدفاع لمنع الهجمات:
+
+تحقق من صحة إدخال المستخدم قبل معالجته. يُفضل مقارنته بقائمة بيضاء للقيم المسموح بها. إذا لم يكن ذلك ممكنًا، فتأكد من أن الإدخال يحتوي فقط على المحتوى المسموح به، مثل الأحرف الأبجدية الرقمية فقط.
+بعد التحقق من صحة المدخلات المُقدمة، أضِفها إلى الدليل الأساسي واستخدم واجهة برمجة تطبيقات نظام ملفات النظام الأساسي لإضفاء الطابع الرسمي على المسار. تأكد من أن المسار الرسمي يبدأ بالدليل الأساسي المتوقع.
+
+
+
 <?php
-/*
-How to Prevent File Upload Attacks
-To avoid these types of file upload attacks, we recommend the following ten best practices:
-
-1. Only allow specific file types. By limiting the list of allowed file types, you can avoid executables, scripts and other potentially malicious content from being uploaded to your application.
-
-2. Verify file types. In addition to restricting the file types, it is important to ensure that no files are ‘masking’ as allowed file types. For instance, if an attacker were to rename an .exe to .docx, and your solution relies entirely on the file extension, it would bypass your check as a Word document which in fact it is not. Therefore, it is important to verify file types before allowing them to be uploaded.
-
-3. Scan for malware. To minimize risk, all files should be scanned for malware. We recommend multiscanning files with multiple anti-malware engines (using a combination of signatures, heuristics, and machine learning detection methods) in order to get the highest detection rate and the shortest window of exposure to malware outbreaks.
-
-4. Remove possible embedded threats. Files such as Microsoft Office, PDF and image files can have embedded threats in hidden scripts and macros that are not always detected by anti-malware engines. To remove risk and make sure that files contain no hidden threats, it is best practice to remove any possible embedded objects by using a methodology called content disarm and reconstruction (CDR).
-
-5. Authenticate users. To increase security, it is good practice to require users to authenticate themselves before uploading a file. However, that doesn’t guarantee the user’s machine itself wasn’t compromised.
-
-6. Set a maximum name length and maximum file size. Make sure to set a maximum name length (restrict allowed characters if possible) and file size in order to prevent a potential service outage.
-
-7. Randomize uploaded file names. Randomly alter the uploaded file names so that attackers cannot try to access the file with the file name they uploaded. When using Deep CDR, you can configure the sanitized file to be a random identifier (e.g. the analysis data_id).
-
-8. Store uploaded files outside the web root folder. The directory to which files are uploaded should be outside of the website’s public directory so that the attackers cannot execute the file via the assigned path URL.
-
-9. Check for vulnerabilities in files. Make sure that you check for vulnerabilities in software and firmware files before they are uploaded.
-
-10. Use simple error messages. When displaying file upload errors, do not include directory paths, server configuration settings, or other information that attackers could potentially use to gain further entry into your systems.
-*/
-
-
-
-
-if( isset( $_POST[ 'Upload' ] ) ) {
-    // Where are we going to be writing to?
-    $target_path  = DVWA_WEB_PAGE_TO_ROOT . "hackable/uploads/";
-    $target_path .= basename( $_FILES[ 'uploaded' ][ 'name' ] );
-
-    // Can we move the file to the upload folder?
-    if( !move_uploaded_file( $_FILES[ 'uploaded' ][ 'tmp_name' ], $target_path ) ) {
-        // No
-        echo '<pre>Your image was not uploaded.</pre>';
-    }
-    else {
-        // Yes!
-        echo "<pre>{$target_path} succesfully uploaded!</pre>";
-    }
+// 1. التحقق من الامتداد
+$allowed_extensions = ['jpg', 'jpeg', 'png', 'gif', 'pdf'];
+$ext = strtolower(pathinfo($_FILES['file']['name'], PATHINFO_EXTENSION));
+if (!in_array($ext, $allowed_extensions)) {
+    die("Extension not allowed");
 }
 
+// 2. التحقق من MIME type
+$finfo = finfo_open(FILEINFO_MIME_TYPE);
+$mime = finfo_file($finfo, $_FILES['file']['tmp_name']);
+$allowed_mimes = ['image/jpeg', 'image/png', 'image/gif'];
+if (!in_array($mime, $allowed_mimes)) {
+    die("Invalid file type");
+}
 
-#----------------------------------------
-  // File information
-    $uploaded_name = $_FILES[ 'uploaded' ][ 'name' ];
-    $uploaded_type = $_FILES[ 'uploaded' ][ 'type' ];
-    $uploaded_size = $_FILES[ 'uploaded' ][ 'size' ];
+// 3. التحقق من الحجم
+$max_size = 2 * 1024 * 1024; // 2MB
+if ($_FILES['file']['size'] > $max_size) {
+    die("File too large");
+}
 
-    // Is it an image?
-    if( ( $uploaded_type == "image/jpeg" || $uploaded_type == "image/png" ) &&
-        ( $uploaded_size < 100000 ) ) {
+// 4. إعادة تسمية الملف (أهم خطوة)
+$new_name = uniqid() . '.' . $ext;
+$upload_dir = __DIR__ . '/uploads/';
 
-  // File information
-    $uploaded_name = $_FILES[ 'uploaded' ][ 'name' ];
-    $uploaded_ext  = substr( $uploaded_name, strrpos( $uploaded_name, '.' ) + 1);
-    $uploaded_size = $_FILES[ 'uploaded' ][ 'size' ];
-    $uploaded_tmp  = $_FILES[ 'uploaded' ][ 'tmp_name' ];
+// 5. التأكد من عدم وجود path traversal
+$destination = $upload_dir . basename($new_name);
+if (strpos(realpath($destination), realpath($upload_dir)) !== 0) {
+    die("Invalid path");
+}
 
-    // Is it an image?
-    if( ( strtolower( $uploaded_ext ) == "jpg" || strtolower( $uploaded_ext ) == "jpeg" || strtolower( $uploaded_ext ) == "png" ) &&
-        ( $uploaded_size < 100000 ) &&
-        getimagesize( $uploaded_tmp ) ) {
+// 6. تخزين خارج web root
+$upload_dir = '/var/www/secure_uploads/'; // ليس public
+
+// 7. تعطيل تنفيذ PHP في مجلد uploads
+// في .htaccess:
+// php_flag engine off
+
+// مثال كامل:
+function secureUpload($file) {
+    $allowed = ['jpg', 'jpeg', 'png', 'gif'];
+    $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+    
+    if (!in_array($ext, $allowed)) return false;
+    if ($file['size'] > 2000000) return false;
+    
+    $finfo = finfo_open(FILEINFO_MIME_TYPE);
+    $mime = finfo_file($finfo, $file['tmp_name']);
+    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/gif'])) return false;
+    
+    $new_name = md5_file($file['tmp_name']) . '.' . $ext;
+    $dest = '/var/secure_uploads/' . $new_name;
+    
+    return move_uploaded_file($file['tmp_name'], $dest);
+}
+?>
+
+<FilesMatch "\.php$">
+    SetHandler none
+</FilesMatch>
+php_flag engine off
+Options -ExecCGI
+AddType text/plain .php .phtml .php3
+
+
+

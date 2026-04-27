@@ -39,3 +39,9 @@ $message = htmlspecialchars( $message );
 
     // Sanitize name input
 $name = preg_replace( '/<(.*)s(.*)c(.*)r(.*)i(.*)p(.*)t/i', '', $name );
+
+
+
+
+
+#---------------------------------------------------------------
